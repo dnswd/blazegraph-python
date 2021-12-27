@@ -1,9 +1,9 @@
 """Provide an interface to SPARQL query endpoints."""
 
-from cStringIO import StringIO
+from io import StringIO
 import datetime
 import urllib
-import urlparse
+from urllib.parse import urlparse
 
 import httplib2
 from lxml import objectify
@@ -14,6 +14,10 @@ import simplejson
 import logging
 
 log = logging.getLogger(__name__)
+
+import sys
+if sys.version_info[0] >= 3:
+    unicode = str
 
 class SPARQLQueryException(Exception):
     """Raised when the SPARQL store returns an HTTP status code other than 200 OK."""
@@ -64,19 +68,19 @@ class _SelectOrUpdate(object):
 
         if self.server.post_directly:
             self.headers["Content-Type"] = self.directContentType() + "; charset=utf-8"
-            uri_params = urllib.urlencode(self.params, doseq=True)
+            uri_params = urllib.parse.urlencode(self.params, doseq=True)
             body = sparql
             method='POST'
         elif self.postQueries():
             self.headers["Content-Type"] = "application/x-www-form-urlencoded"
             uri_params = None
             self.params[self.query_or_update()] = sparql
-            body = urllib.urlencode(self.params, doseq=True)
+            body = urllib.parse.urlencode(self.params, doseq=True)
             method='POST'
         else:
             # select only
             self.params[self.query_or_update()] = sparql
-            uri_params = urllib.urlencode(self.params, doseq=True)
+            uri_params = urllib.parse.urlencode(self.params, doseq=True)
             body = None
             method='GET'
 
