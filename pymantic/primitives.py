@@ -6,7 +6,7 @@ import collections
 import datetime
 from operator import itemgetter
 import urllib
-import urlparse
+import urllib.parse
 
 import pymantic.uri_schemes as uri_schemes
 

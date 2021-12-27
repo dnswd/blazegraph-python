@@ -1,11 +1,12 @@
 """Provides common classes and functions for modelling an RDF graph using
 Python objects."""
 
+import sys
 import os.path
 import urlparse
 import re
 import logging
-from cStringIO import StringIO
+from io import StringIO
 from string import Template
 
 import pymantic.util as util
@@ -13,10 +14,14 @@ from pymantic.primitives import *
 
 log = logging.getLogger(__name__)
 
+if sys.version_info[0] >= 3:
+    unicode = str
+
+
 class MetaResource(type):
     """Aggregates Prefix and scalar information."""
 
-    _classes = {} # Map of RDF classes to Python classes.
+    _classes = {}  # Map of RDF classes to Python classes.
 
     def __new__(cls, name, bases, dct):
         prefixes = PrefixMap()
@@ -36,6 +41,7 @@ class MetaResource(type):
         dct['scalars'] = frozenset(scalars)
         return type.__new__(cls, name, bases, dct)
 
+
 def register_class(rdf_type):
     """Register a class for automatic instantiation VIA Resource.classify."""
     def _register_class(python_class):
@@ -45,10 +51,12 @@ def register_class(rdf_type):
         return python_class
     return _register_class
 
+
 class URLRetrievalError(Exception):
     """Raised when an attempt to retrieve a resource returns a status other
     than 200 OK."""
     pass
+
 
 class Resource(object):
     """Provides necessary context and utility methods for accessing a Resource
@@ -92,7 +100,7 @@ class Resource(object):
     __metaclass__ = MetaResource
 
     prefixes = {'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
-                  'rdfs': 'http://www.w3.org/2000/01/rdf-schema#'}
+                'rdfs': 'http://www.w3.org/2000/01/rdf-schema#'}
 
     scalars = frozenset(('rdfs:label',))
 
@@ -107,10 +115,10 @@ class Resource(object):
         self.subject = subject
 
     @classmethod
-    def new(cls, graph, subject = None):
+    def new(cls, graph, subject=None):
         """Add type information to the graph for a new instance of this Resource."""
-        #for prefix, Prefix in cls.prefixes.iteritems():
-            #graph.bind(prefix, Prefix)
+        # for prefix, Prefix in cls.prefixes.iteritems():
+        #graph.bind(prefix, Prefix)
         if subject is None:
             subject = BlankNode()
         if not isinstance(subject, NamedNode):
@@ -130,8 +138,8 @@ class Resource(object):
         if hasattr(self, 'rdf_classes'):
             for rdf_class in self.rdf_classes:
                 if not any(self.graph.match(self.subject,
-                                                   self.resolve('rdf:type'),
-                                                   rdf_class)):
+                                            self.resolve('rdf:type'),
+                                            rdf_class)):
                     return False
         return True
 
@@ -144,7 +152,7 @@ class Resource(object):
         if isinstance(other, Resource):
             return self.subject == other.subject
         elif isinstance(other, NamedNode) or isinstance(other, str) or\
-             isinstance(other, unicode):
+                isinstance(other, unicode):
             return unicode(self.subject) == unicode(other)
         return NotImplemented
 
@@ -160,35 +168,35 @@ class Resource(object):
 
     def bare_literals(self, predicate):
         """Objects for a predicate that are language-less, datatype-less Literals."""
-        return [t.object for t in self.graph.match(self.subject, predicate, None) if\
-                hasattr(t.object, 'language') and t.object.language is None and\
+        return [t.object for t in self.graph.match(self.subject, predicate, None) if
+                hasattr(t.object, 'language') and t.object.language is None and
                 hasattr(t.object, 'datatype') and t.object.datatype is None]
 
     def objects_by_lang(self, predicate, lang=None):
         """Objects for a predicate that match a specified language or, if
         language is None, have a language specified."""
         if lang:
-            return [t.object for t in self.graph.match(self.subject, predicate, None) if\
+            return [t.object for t in self.graph.match(self.subject, predicate, None) if
                     hasattr(t.object, 'language') and lang_match(lang, t.object.language)]
         elif lang == '':
             return self.bare_literals(predicate)
         else:
-            return [t.object for t in self.graph.match(self.subject, predicate, None) if\
+            return [t.object for t in self.graph.match(self.subject, predicate, None) if
                     hasattr(t.object, 'language') and t.object.language is not None]
 
     def objects_by_datatype(self, predicate, datatype=None):
         """Objects for a predicate that match a specified datatype or, if
         datatype is None, have a datatype specified."""
         if datatype:
-            return [t.object for t in self.graph.match(self.subject, predicate, None) if\
+            return [t.object for t in self.graph.match(self.subject, predicate, None) if
                     hasattr(t.object, 'datatype') and t.object.datatype == datatype]
         elif datatype == '':
             return self.bare_literals(predicate)
         else:
-            return [t.object for t in self.graph.match(self.subject, predicate, None) if\
+            return [t.object for t in self.graph.match(self.subject, predicate, None) if
                     hasattr(t.object, 'datatype') and t.object.datatype is not None]
 
-    def objects_by_type(self, predicate, resource_class = None):
+    def objects_by_type(self, predicate, resource_class=None):
         """Objects for a predicate that are instances of a particular Resource
         subclass or, if resource_class is none, are Resources."""
         selected_objects = []
@@ -205,7 +213,7 @@ class Resource(object):
         """All objects for a predicate."""
         return [t.object for t in self.graph.match(self.subject, predicate, None)]
 
-    def object_of(self, predicate = None):
+    def object_of(self, predicate=None):
         """All subjects for which this resource is an object for the given
         predicate."""
         if predicate is None:
@@ -285,7 +293,8 @@ class Resource(object):
         if isinstance(value, frozenset):
             for obj in value:
                 if isinstance(obj, Resource):
-                    self.graph.add(Triple(self.subject, predicate, obj.subject))
+                    self.graph.add(
+                        Triple(self.subject, predicate, obj.subject))
                 else:
                     self.graph.add(Triple(self.subject, predicate, obj))
         else:
@@ -316,7 +325,7 @@ class Resource(object):
         if objects:
             return True
         return False
-    
+
     def __iter__(self):
         for s, p, o in self.graph.match(self.subject, None, None):
             yield p, o
@@ -359,7 +368,7 @@ class Resource(object):
                 return Resource(graph, obj)
         types = frozenset([t.object for t in graph.match(
             obj, cls.resolve('rdf:type'), None)])
-        python_classes = tuple(cls.__metaclass__._classes[t] for t in types if\
+        python_classes = tuple(cls.__metaclass__._classes[t] for t in types if
                                t in cls.__metaclass__._classes)
         if len(python_classes) == 0:
             return Resource(graph, obj)
@@ -368,7 +377,7 @@ class Resource(object):
         else:
             if types not in cls.__metaclass__._classes:
                 the_class = cls.__metaclass__.__new__(
-                    cls.__metaclass__, ''.join(python_class.__name__ for\
+                    cls.__metaclass__, ''.join(python_class.__name__ for
                                                python_class in python_classes),
                     python_classes, {'_autocreate': True})
                 cls.__metaclass__._classes[types] = the_class
@@ -383,7 +392,7 @@ class Resource(object):
         rdf_class = None
         if isinstance(key, tuple) and len(key) >= 2:
             if key[1] is None:
-                pass # All values are already None, do nothing.
+                pass  # All values are already None, do nothing.
             elif isinstance(key[1], MetaResource):
                 rdf_class = key[1]
             elif is_language(key[1]):
@@ -405,7 +414,6 @@ class Resource(object):
             return ''
         else:
             return datatype
-
 
     def _objects_for_key(self, key):
         """Find objects that are potentially interesting when doing normal
@@ -440,16 +448,16 @@ class Resource(object):
     def _objects_for_implicit_set(self, predicate, value):
         """Find the objects that should be removed from the graph when doing a
         dictionary-style set with implicit type information."""
-        if (isinstance(value, frozenset) or (isinstance(value, tuple) and\
+        if (isinstance(value, frozenset) or (isinstance(value, tuple) and
                                              not isinstance(value, Literal))) and\
            predicate in self.scalars:
             raise ValueError('Cannot store sequences in scalars')
         elif predicate in self.scalars and isinstance(value, Literal)\
-             and value.language:
+                and value.language:
             return self.objects_by_lang(predicate, value.language) +\
-                   self.objects_by_datatype(predicate) +\
-                   self.objects_by_type(predicate) +\
-                   self.bare_literals(predicate)
+                self.objects_by_datatype(predicate) +\
+                self.objects_by_type(predicate) +\
+                self.bare_literals(predicate)
         else:
             return self.objects(predicate)
 
@@ -460,16 +468,16 @@ class Resource(object):
             raise ValueError('Improper value provided.')
         if lang and predicate in self.scalars:
             return self.objects_by_lang(predicate, lang) +\
-                   self.objects_by_datatype(predicate) +\
-                   self.objects_by_type(predicate)
+                self.objects_by_datatype(predicate) +\
+                self.objects_by_type(predicate)
         elif lang and predicate not in self.scalars:
             return self.objects_by_lang(predicate, lang) +\
-                   self.objects_by_type(predicate)
+                self.objects_by_type(predicate)
         elif predicate in self.scalars:
             return self.objects(predicate)
         elif datatype:
             return self.objects_by_datatype(predicate, datatype) +\
-                   self.objects_by_type(predicate)
+                self.objects_by_type(predicate)
         elif rdf_class:
             return self.objects_by_type(predicate, rdf_class)
 
@@ -483,10 +491,10 @@ class Resource(object):
         for t in self.graph.match(self.subject, None, None):
             self.graph.add((target_subject, t.predicate, t.object))
         return self.classify(self.graph, target_subject)
-    
+
     def as_(self, target_class):
         return target_class(self.graph, self.subject)
-    
+
 
 class List(Resource):
     """Convenience class for dealing with RDF lists.
@@ -503,42 +511,44 @@ class List(Resource):
             current = current['rdf:rest']
             if current.subject != self.resolve('rdf:nil'):
                 current = current.as_(type(self))
-    
+
     @classmethod
     def is_list(cls, node, graph):
         """Determine if a given node is plausibly the subject of a list element."""
         return bool(list(graph.match(
-            subject = node, predicate = cls.resolve('rdf:rest'))))
-            
+            subject=node, predicate=cls.resolve('rdf:rest'))))
+
 
 def literalize(graph, value, lang, datatype):
     """Convert either a value or a sequence of values to either a Literal or
     a Resource."""
     if isinstance(value, set) or isinstance(value, frozenset) or\
-       isinstance(value, list) or (isinstance(value, tuple) and\
+       isinstance(value, list) or (isinstance(value, tuple) and
                                    not isinstance(value, Literal)):
         return frozenset(objectify_value(graph, v, lang, datatype) for v in value)
     else:
         return objectify_value(graph, value, lang, datatype)
 
-def objectify_value(graph, value, lang = None, datatype = None):
+
+def objectify_value(graph, value, lang=None, datatype=None):
     """Convert a single value into either a Literal or a Resource."""
     if isinstance(value, BlankNode) or isinstance(value, NamedNode):
         return Resource.classify(graph, value)
     elif isinstance(value, Literal) or isinstance(value, Resource):
         return value
     elif isinstance(value, str) or isinstance(value, unicode):
-        return Literal(value, language = lang, datatype = datatype)
+        return Literal(value, language=lang, datatype=datatype)
     else:
         return Literal(value)
+
 
 def check_objects(graph, value, lang, datatype, rdf_class):
     """Determine that value or the things in values are appropriate for the
     specified explicit object access key."""
-    if isinstance(value, frozenset) or (isinstance(value, tuple) and\
+    if isinstance(value, frozenset) or (isinstance(value, tuple) and
                                         not isinstance(value, Literal)):
         for v in value:
-            if (lang and (not hasattr(v, 'language') or\
+            if (lang and (not hasattr(v, 'language') or
                           not lang_match(v.language, lang))) or \
                (datatype and v.datatype != datatype) or \
                (rdf_class and not isinstance(v, rdf_class)):
